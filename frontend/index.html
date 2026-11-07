@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vision &bull; Minimal AI</title>
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Marked.js for Markdown -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+  <!-- Highlight.js for Code -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark-dimmed.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      letter-spacing: -0.011em;
+    }
+
+    code, kbd, .font-mono {
+      font-family: 'JetBrains Mono', Menlo, Consolas, monospace;
+    }
+
+    /* Scrollbars */
+    ::-webkit-scrollbar { width: 4px; height: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.2); }
+
+    /* Reading Canvas Typography (Claude/Vercel style) */
+    .prose-custom {
+      font-size: 0.9375rem;
+      line-height: 1.7;
+      color: #d4d4d8;
+    }
+    .prose-custom p { margin-bottom: 0.9rem; }
+    .prose-custom p:last-child { margin-bottom: 0; }
+    .prose-custom h1, .prose-custom h2, .prose-custom h3 {
+      color: #fafafa;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      margin-top: 1.25rem;
+      margin-bottom: 0.5rem;
+    }
+    .prose-custom h1 { font-size: 1.2rem; }
+    .prose-custom h2 { font-size: 1.05rem; }
+    .prose-custom h3 { font-size: 0.95rem; }
+    .prose-custom ul, .prose-custom ol {
+      margin-left: 1.25rem;
+      margin-bottom: 0.9rem;
+      list-style-type: disc;
+    }
+    .prose-custom ol { list-style-type: decimal; }
+    .prose-custom li { margin-bottom: 0.35rem; }
+    .prose-custom code:not(pre code) {
+      background: #18181b;
+      color: #e4e4e7;
+      padding: 0.2rem 0.4rem;
+      border-radius: 0.375rem;
+      font-size: 0.85em;
+      border: 1px solid #27272a;
+    }
+    .prose-custom pre {
+      background: #101014 !important;
+      border: 1px solid #27272a;
+      border-radius: 0.75rem;
+      padding: 0.875rem 1rem;
+      margin: 0.875rem 0;
+      overflow-x: auto;
+    }
+    .prose-custom blockquote {
+      border-left: 2px solid #3f3f46;
+      padding-left: 0.875rem;
+      color: #a1a1aa;
+      font-style: italic;
+      margin: 0.9rem 0;
+    }
+
+    /* Subtle shimmer animation for loading */
+    @keyframes shimmer {
+      0% { opacity: 0.4; }
+      50% { opacity: 1; }
+      100% { opacity: 0.4; }
+    }
+    .animate-shimmer {
+      animation: shimmer 1.8s ease-in-out infinite;
+    }
+  </style>
+</head>
+<body class="bg-[#09090b] text-zinc-100 min-h-screen flex selection:bg-zinc-800 selection:text-white">
+
+  <!-- Fullscreen Drag & Drop Target -->
+  <div id="dropOverlay" class="fixed inset-0 z-50 bg-[#09090b]/80 backdrop-blur-sm flex items-center justify-center pointer-events-none opacity-0 transition-opacity duration-150">
+    <div class="border border-dashed border-zinc-600 bg-zinc-900/90 rounded-2xl p-8 text-center max-w-sm mx-4 shadow-2xl">
+      <div class="w-10 h-10 mx-auto rounded-xl bg-zinc-800 text-zinc-300 flex items-center justify-center mb-3">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+      </div>
+      <p class="text-sm font-medium text-zinc-200">Drop image to attach</p>
+      <p class="text-xs text-zinc-500 mt-1">PNG, JPG, WebP</p>
+    </div>
+  </div>
+
+  <!-- Image Lightbox Modal -->
+  <div id="lightboxModal" class="fixed inset-0 z-50 bg-black/85 backdrop-blur-md hidden items-center justify-center p-6">
+    <button id="closeLightboxBtn" class="absolute top-5 right-5 text-zinc-400 hover:text-white p-2 rounded-lg bg-zinc-900/80 border border-zinc-800 transition">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+    </button>
+    <div class="max-w-4xl max-h-[85vh] flex flex-col items-center">
+      <img id="lightboxImg" src="" alt="Enlarged view" class="max-h-[80vh] w-auto max-w-full rounded-xl object-contain border border-zinc-800 shadow-2xl">
+      <div id="lightboxCaption" class="mt-3 text-xs text-zinc-500 font-mono"></div>
+    </div>
+  </div>
+
+  <!-- Collapsible Minimalist Sidebar -->
+  <aside id="sidebar" class="w-64 border-r border-zinc-800/80 bg-[#0c0c0e] flex flex-col fixed inset-y-0 left-0 md:static -translate-x-full md:translate-x-0 transition-transform duration-200 z-30">
+    
+    <!-- Workspace Title & Collapse -->
+    <div class="h-14 px-4 flex items-center justify-between border-b border-zinc-800/60">
+      <div class="flex items-center gap-2">
+        <div class="w-5 h-5 rounded-md bg-zinc-100 text-zinc-950 flex items-center justify-center font-bold text-xs">
+          V
+        </div>
+        <span class="text-xs font-semibold tracking-tight text-zinc-200">Vision Workspace</span>
+      </div>
+      <button id="closeSidebarBtn" class="md:hidden text-zinc-500 hover:text-zinc-300 p-1">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+
+    <!-- New Chat Trigger -->
+    <div class="p-3">
+      <button id="newChatBtn" class="w-full flex items-center justify-between px-3 py-2 rounded-lg bg-zinc-900 hover:bg-zinc-800/90 text-zinc-300 border border-zinc-800 text-xs font-medium transition group">
+        <span class="flex items-center gap-2">
+          <svg class="w-3.5 h-3.5 text-zinc-400 group-hover:text-zinc-200" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+          New conversation
+        </span>
+        <kbd class="text-[10px] text-zinc-500 font-mono">⌘K</kbd>
+      </button>
+    </div>
+
+    <!-- Thread History -->
+    <div class="flex-1 overflow-y-auto px-2 py-1 space-y-0.5" id="chatHistoryList">
+      <!-- Injected dynamically -->
+    </div>
+
+    <!-- Endpoint / Settings Pill at bottom -->
+    <div class="p-3 border-t border-zinc-800/60 space-y-2">
+      <div class="flex items-center justify-between text-[11px] text-zinc-500">
+        <span class="flex items-center gap-1.5 font-mono">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+          127.0.0.1:8000
+        </span>
+        <button id="exportChatBtn" class="text-zinc-500 hover:text-zinc-300 transition" title="Export Markdown">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+        </button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main Canvas -->
+  <main class="flex-1 flex flex-col min-w-0 h-screen overflow-hidden bg-[#09090b]">
+
+    <!-- Minimal Header -->
+    <header class="h-14 px-4 md:px-6 flex items-center justify-between border-b border-zinc-800/60 flex-shrink-0">
+      <div class="flex items-center gap-3">
+        <button id="toggleSidebarBtn" class="text-zinc-400 hover:text-zinc-200 p-1.5 rounded-md hover:bg-zinc-900 transition">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/></svg>
+        </button>
+        <div class="flex items-center gap-2">
+          <span class="text-xs font-medium text-zinc-300" id="headerTitle">Chat</span>
+          <span class="text-zinc-600">&bull;</span>
+          <span class="text-[11px] font-mono text-zinc-500">Gemini 3.5 Flash</span>
+        </div>
+      </div>
+
+      <!-- Settings Dropdown -->
+      <div class="flex items-center gap-2">
+        <div class="relative">
+          <button id="settingsBtn" class="flex items-center gap-1.5 text-xs text-zinc-400 hover:text-zinc-200 px-2.5 py-1.5 rounded-md hover:bg-zinc-900 transition border border-transparent hover:border-zinc-800">
+            <span class="server-status-dot w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            <span class="server-status-text text-[11px] font-mono hidden sm:inline text-zinc-400">Online</span>
+            <svg class="w-3.5 h-3.5 text-zinc-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+          </button>
+          <div id="settingsMenu" class="hidden absolute right-0 mt-2 w-72 p-3.5 bg-zinc-900 border border-zinc-800 rounded-xl shadow-2xl z-40 space-y-3">
+            <div>
+              <div class="flex items-center justify-between mb-1">
+                <label class="text-[10px] font-mono uppercase text-zinc-500 font-semibold">FastAPI Endpoint</label>
+                <span class="server-status-text text-[10px] font-mono text-emerald-400">Online</span>
+              </div>
+              <input 
+                id="apiUrlInput" 
+                type="text" 
+                value="http://127.0.0.1:8000/api/v1/chat"
+                class="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-2.5 py-1.5 text-xs font-mono text-zinc-200 focus:outline-none focus:border-zinc-600"
+              />
+            </div>
+            <div class="pt-2 border-t border-zinc-800/80">
+              <button 
+                id="clearThreadBtn" 
+                type="button"
+                class="w-full text-left px-2.5 py-1.5 rounded-lg text-xs text-rose-400 hover:bg-rose-500/10 border border-rose-500/20 transition flex items-center justify-between"
+              >
+                <span>Reset thread memory</span>
+                <span class="text-[10px] font-mono opacity-60">DELETE</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Reading Canvas (Claude style: clean vertical stream) -->
+    <div id="threadScroll" class="flex-1 overflow-y-auto px-4 py-8">
+      <div class="max-w-2xl mx-auto space-y-8" id="threadContainer">
+        
+        <!-- Empty State Hero -->
+        <div id="emptyHero" class="text-center py-20 space-y-4">
+          <div class="w-9 h-9 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-300 flex items-center justify-center mx-auto">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+          </div>
+          <div>
+            <h1 class="text-sm font-medium text-zinc-200">How can I assist you?</h1>
+            <p class="text-xs text-zinc-500 mt-1 max-w-sm mx-auto">Upload an image to inspect, transcribe handwriting, analyze diagrams, or ask any question.</p>
+          </div>
+
+          <!-- Subtle prompt micro-pills -->
+          <div class="flex flex-wrap items-center justify-center gap-1.5 pt-2">
+            <button class="starter-pill text-[11px] text-zinc-400 hover:text-zinc-200 bg-zinc-900/60 hover:bg-zinc-800/80 border border-zinc-800/80 px-2.5 py-1 rounded-full transition">
+              Describe this image
+            </button>
+            <button class="starter-pill text-[11px] text-zinc-400 hover:text-zinc-200 bg-zinc-900/60 hover:bg-zinc-800/80 border border-zinc-800/80 px-2.5 py-1 rounded-full transition">
+              Extract text / OCR
+            </button>
+            <button class="starter-pill text-[11px] text-zinc-400 hover:text-zinc-200 bg-zinc-900/60 hover:bg-zinc-800/80 border border-zinc-800/80 px-2.5 py-1 rounded-full transition">
+              Explain chart or code
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- The Command Deck (Linear / Raycast Style Input Box) -->
+    <div class="px-4 pb-5 pt-2 flex-shrink-0">
+      <div class="max-w-2xl mx-auto">
+        
+        <form id="commandForm" class="bg-[#121215] border border-zinc-800/90 rounded-2xl p-3 shadow-2xl focus-within:border-zinc-700 transition">
+          
+          <!-- Staged Image Attachment Chip -->
+          <div id="attachmentPill" class="hidden mb-2.5 p-1.5 pl-2 bg-zinc-950 border border-zinc-800 rounded-xl flex items-center justify-between max-w-sm">
+            <div class="flex items-center gap-2 overflow-hidden">
+              <img id="attachedThumb" src="" alt="Thumbnail" class="w-8 h-8 rounded-lg object-cover border border-zinc-800 cursor-pointer" title="Click to view">
+              <div class="truncate">
+                <span id="attachedName" class="text-xs text-zinc-300 block truncate">image.png</span>
+                <span id="attachedSize" class="text-[10px] text-zinc-500 font-mono">0 KB</span>
+              </div>
+            </div>
+            <button type="button" id="removeAttachBtn" class="text-zinc-500 hover:text-zinc-300 p-1.5 rounded-lg hover:bg-zinc-900 transition">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+          </div>
+
+          <!-- Hidden File Input -->
+          <input type="file" id="fileInput" accept="image/png,image/jpeg,image/webp,image/gif" class="hidden" />
+
+          <!-- Textarea Input -->
+          <textarea 
+            id="promptInput" 
+            rows="1" 
+            placeholder="Ask a question or paste an image..."
+            class="w-full bg-transparent text-zinc-100 placeholder-zinc-500 text-sm focus:outline-none resize-none max-h-40 leading-relaxed px-1"
+          ></textarea>
+
+          <!-- Input Action Bar -->
+          <div class="flex items-center justify-between pt-2 mt-1 border-t border-zinc-800/40">
+            
+            <div class="flex items-center gap-1">
+              <!-- Attachment Button -->
+              <button 
+                type="button" 
+                id="attachBtn"
+                class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/70 text-xs font-medium transition"
+                title="Attach an image"
+              >
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/></svg>
+                <span>Attach</span>
+              </button>
+
+              <span class="text-zinc-600 text-xs">&bull;</span>
+              <span class="text-[11px] text-zinc-500 hidden sm:inline">Paste images directly with <kbd class="px-1 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-zinc-400 font-mono text-[10px]">⌘V</kbd></span>
+            </div>
+
+            <!-- Submit Button (High-Contrast Vercel/Claude style) -->
+            <button 
+              type="submit" 
+              id="sendBtn"
+              class="w-7 h-7 rounded-lg bg-zinc-100 hover:bg-white text-zinc-950 flex items-center justify-center transition disabled:opacity-20 disabled:hover:bg-zinc-100"
+              title="Send (Enter)"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 10l7-7m0 0l7 7m-7-7v18"/></svg>
+            </button>
+
+          </div>
+
+        </form>
+
+      </div>
+    </div>
+
+  </main>
+
+  <script>
+    // State
+    const state = {
+      chats: JSON.parse(localStorage.getItem('v_chats') || '[]'),
+      currentId: null,
+      currentFile: null,
+    };
+
+    // Elements
+    const threadScroll = document.getElementById('threadScroll');
+    const threadContainer = document.getElementById('threadContainer');
+    const emptyHero = document.getElementById('emptyHero');
+    const commandForm = document.getElementById('commandForm');
+    const promptInput = document.getElementById('promptInput');
+    const fileInput = document.getElementById('fileInput');
+    const attachBtn = document.getElementById('attachBtn');
+    const attachmentPill = document.getElementById('attachmentPill');
+    const attachedThumb = document.getElementById('attachedThumb');
+    const attachedName = document.getElementById('attachedName');
+    const attachedSize = document.getElementById('attachedSize');
+    const removeAttachBtn = document.getElementById('removeAttachBtn');
+    const sendBtn = document.getElementById('sendBtn');
+    const sidebar = document.getElementById('sidebar');
+    const toggleSidebarBtn = document.getElementById('toggleSidebarBtn');
+    const closeSidebarBtn = document.getElementById('closeSidebarBtn');
+    const newChatBtn = document.getElementById('newChatBtn');
+    const chatHistoryList = document.getElementById('chatHistoryList');
+    const headerTitle = document.getElementById('headerTitle');
+    const apiUrlInput = document.getElementById('apiUrlInput');
+    const settingsBtn = document.getElementById('settingsBtn');
+    const settingsMenu = document.getElementById('settingsMenu');
+    const exportChatBtn = document.getElementById('exportChatBtn');
+    const dropOverlay = document.getElementById('dropOverlay');
+    const lightboxModal = document.getElementById('lightboxModal');
+    const lightboxImg = document.getElementById('lightboxImg');
+    const lightboxCaption = document.getElementById('lightboxCaption');
+    const closeLightboxBtn = document.getElementById('closeLightboxBtn');
+
+    // Auto-resize textarea
+    promptInput.addEventListener('input', () => {
+      promptInput.style.height = 'auto';
+      promptInput.style.height = Math.min(promptInput.scrollHeight, 160) + 'px';
+      updateSendButtonState();
+    });
+
+    promptInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        commandForm.dispatchEvent(new Event('submit'));
+      }
+    });
+
+    // Keyboard shortcut for Cmd+K (New chat)
+    window.addEventListener('keydown', (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        createNewChat();
+      }
+    });
+
+    // Settings dropdown toggle
+    settingsBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      settingsMenu.classList.toggle('hidden');
+    });
+    document.addEventListener('click', () => settingsMenu.classList.add('hidden'));
+
+    // Attachment
+    attachBtn.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', (e) => {
+      if (e.target.files && e.target.files[0]) stageFile(e.target.files[0]);
+    });
+
+    removeAttachBtn.addEventListener('click', () => {
+      state.currentFile = null;
+      fileInput.value = '';
+      attachmentPill.classList.add('hidden');
+      updateSendButtonState();
+    });
+
+    function stageFile(file) {
+      if (!file.type.startsWith('image/')) {
+        alert('Please choose an image file.');
+        return;
+      }
+      state.currentFile = file;
+      attachedName.textContent = file.name || 'image.png';
+      attachedSize.textContent = (file.size / 1024).toFixed(1) + ' KB';
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        attachedThumb.src = e.target.result;
+        attachmentPill.classList.remove('hidden');
+      };
+      reader.readAsDataURL(file);
+      updateSendButtonState();
+    }
+
+    attachedThumb.addEventListener('click', () => {
+      if (attachedThumb.src) openLightbox(attachedThumb.src, attachedName.textContent);
+    });
+
+    function updateSendButtonState() {
+      const hasText = promptInput.value.trim().length > 0;
+      const hasFile = state.currentFile !== null;
+      sendBtn.disabled = !hasText && !hasFile;
+    }
+
+    // Drag and Drop
+    let dragCount = 0;
+    window.addEventListener('dragenter', (e) => {
+      e.preventDefault();
+      dragCount++;
+      dropOverlay.classList.remove('opacity-0', 'pointer-events-none');
+    });
+    window.addEventListener('dragleave', (e) => {
+      e.preventDefault();
+      dragCount--;
+      if (dragCount <= 0) {
+        dragCount = 0;
+        dropOverlay.classList.add('opacity-0', 'pointer-events-none');
+      }
+    });
+    window.addEventListener('dragover', (e) => e.preventDefault());
+    window.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dragCount = 0;
+      dropOverlay.classList.add('opacity-0', 'pointer-events-none');
+      if (e.dataTransfer.files && e.dataTransfer.files[0]) stageFile(e.dataTransfer.files[0]);
+    });
+
+    // Clipboard Paste
+    window.addEventListener('paste', (e) => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      for (const item of items) {
+        if (item.type.startsWith('image/')) {
+          const file = item.getAsFile();
+          if (file) {
+            stageFile(file);
+            break;
+          }
+        }
+      }
+    });
+
+    // Lightbox
+    function openLightbox(src, caption = '') {
+      lightboxImg.src = src;
+      lightboxCaption.textContent = caption;
+      lightboxModal.classList.remove('hidden');
+      lightboxModal.classList.add('flex');
+    }
+    closeLightboxBtn.addEventListener('click', () => {
+      lightboxModal.classList.add('hidden');
+      lightboxModal.classList.remove('flex');
+    });
+    lightboxModal.addEventListener('click', (e) => {
+      if (e.target === lightboxModal) closeLightboxBtn.click();
+    });
+
+    // Sidebar Toggles
+    toggleSidebarBtn.addEventListener('click', () => sidebar.classList.toggle('-translate-x-full'));
+    closeSidebarBtn.addEventListener('click', () => sidebar.classList.add('-translate-x-full'));
+
+    // Starter pills
+    document.querySelectorAll('.starter-pill').forEach(pill => {
+      pill.addEventListener('click', () => {
+        promptInput.value = pill.textContent.trim();
+        promptInput.focus();
+        promptInput.dispatchEvent(new Event('input'));
+      });
+    });
+
+    // Session Management
+    function init() {
+      if (!state.chats.length) {
+        createNewChat();
+      } else {
+        loadChat(state.chats[0].id);
+      }
+      renderHistory();
+      updateSendButtonState();
+      checkServerHealth();
+    }
+
+    newChatBtn.addEventListener('click', () => {
+      createNewChat();
+      sidebar.classList.add('-translate-x-full');
+    });
+
+    function createNewChat() {
+      const chat = {
+        id: 'c_' + Date.now(),
+        title: 'New conversation',
+        timestamp: Date.now(),
+        messages: []
+      };
+      state.chats.unshift(chat);
+      save();
+      loadChat(chat.id);
+      renderHistory();
+    }
+
+    function loadChat(id) {
+      state.currentId = id;
+      const chat = state.chats.find(c => c.id === id);
+      if (!chat) return;
+
+      headerTitle.textContent = chat.title || 'Chat';
+      threadContainer.innerHTML = '';
+
+      if (!chat.messages.length) {
+        threadContainer.appendChild(emptyHero);
+        emptyHero.classList.remove('hidden');
+      } else {
+        emptyHero.classList.add('hidden');
+        chat.messages.forEach(m => renderMessage(m));
+      }
+      threadScroll.scrollTop = threadScroll.scrollHeight;
+      renderHistory();
+    }
+
+    function save() {
+      localStorage.setItem('v_chats', JSON.stringify(state.chats));
+    }
+
+    function renderHistory() {
+      chatHistoryList.innerHTML = '';
+      state.chats.forEach(c => {
+        const active = c.id === state.currentId;
+        const item = document.createElement('div');
+        item.className = `group flex items-center justify-between px-2.5 py-1.5 rounded-md text-xs cursor-pointer transition ${active ? 'bg-zinc-800 text-zinc-100 font-medium' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/60'}`;
+        item.innerHTML = `
+          <span class="truncate flex-1" onclick="loadChat('${c.id}')">${escapeHtml(c.title || 'Untitled')}</span>
+          <button class="opacity-0 group-hover:opacity-100 hover:text-zinc-200 text-zinc-500 p-1" onclick="deleteChat(event, '${c.id}')">
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        `;
+        chatHistoryList.appendChild(item);
+      });
+    }
+
+    window.loadChat = loadChat;
+    window.deleteChat = async (e, id) => {
+      e.stopPropagation();
+      try {
+        const endpoint = apiUrlInput.value.trim() || 'http://127.0.0.1:8000/api/v1/chat';
+        await fetch(`${endpoint}?thread_id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+      } catch (err) {
+        console.warn('Could not delete thread on server:', err);
+      }
+      state.chats = state.chats.filter(c => c.id !== id);
+      save();
+      if (state.currentId === id) {
+        if (state.chats.length) loadChat(state.chats[0].id);
+        else createNewChat();
+      } else {
+        renderHistory();
+      }
+    };
+
+    // Export Chat
+    exportChatBtn.addEventListener('click', () => {
+      const chat = state.chats.find(c => c.id === state.currentId);
+      if (!chat || !chat.messages.length) return;
+      let md = `# ${chat.title}\n\n`;
+      chat.messages.forEach(m => {
+        md += `**${m.role === 'user' ? 'User' : 'Assistant'}**:\n\n${m.content}\n\n---\n\n`;
+      });
+      const blob = new Blob([md], { type: 'text/markdown' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `${(chat.title || 'chat').replace(/\s+/g, '_')}.md`;
+      a.click();
+    });
+
+    // Render Message (Claude/Linear style)
+    function renderMessage(msg) {
+      emptyHero.classList.add('hidden');
+      const isUser = msg.role === 'user';
+      const container = document.createElement('div');
+      container.className = isUser ? 'flex justify-end' : 'flex justify-start';
+
+      if (isUser) {
+        // User message: sleek, subtle capsule
+        let imagePreviewHtml = '';
+        if (msg.imageSrc) {
+          imagePreviewHtml = `
+            <div class="mb-2 rounded-xl overflow-hidden border border-zinc-700/60 max-w-xs cursor-pointer hover:opacity-90 transition" onclick="openLightbox('${msg.imageSrc}')">
+              <img src="${msg.imageSrc}" alt="Input" class="max-h-60 w-auto object-contain bg-zinc-950">
+            </div>
+          `;
+        }
+
+        container.innerHTML = `
+          <div class="max-w-[85%] bg-zinc-800/80 border border-zinc-700/40 text-zinc-100 rounded-2xl px-4 py-2.5 text-sm shadow-sm">
+            ${imagePreviewHtml}
+            <div class="whitespace-pre-wrap">${escapeHtml(msg.content)}</div>
+          </div>
+        `;
+      } else {
+        // Assistant message: NO BOX, flowing typography directly on canvas
+        const parsed = marked.parse(msg.content || '');
+        container.innerHTML = `
+          <div class="w-full space-y-2 group">
+            <div class="flex items-center gap-2 text-[11px] text-zinc-500 font-mono">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+              <span>Gemini Vision</span>
+              ${msg.latency ? `<span>&bull;</span><span>${msg.latency}s</span>` : ''}
+            </div>
+            
+            <div class="prose-custom">
+              ${parsed}
+            </div>
+
+            <div class="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-3 pt-1 text-[11px] text-zinc-500">
+              <button class="hover:text-zinc-300 flex items-center gap-1 transition" onclick="copyText(this, \`${encodeURIComponent(msg.content)}\`)">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                <span>Copy</span>
+              </button>
+              <button class="hover:text-zinc-300 flex items-center gap-1 transition" onclick="speakText(\`${encodeURIComponent(msg.content)}\`)">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/></svg>
+                <span>Listen</span>
+              </button>
+            </div>
+          </div>
+        `;
+
+        container.querySelectorAll('pre code').forEach((block) => {
+          hljs.highlightElement(block);
+        });
+      }
+
+      threadContainer.appendChild(container);
+      threadScroll.scrollTop = threadScroll.scrollHeight;
+    }
+
+    // Shimmer loading line
+    function showLoading() {
+      emptyHero.classList.add('hidden');
+      const loader = document.createElement('div');
+      loader.id = 'shimmerLoader';
+      loader.className = 'w-full py-2 space-y-2.5 animate-shimmer';
+      loader.innerHTML = `
+        <div class="flex items-center gap-2 text-[11px] text-zinc-500 font-mono">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+          <span>Analyzing visual context...</span>
+        </div>
+        <div class="h-2.5 bg-zinc-800/60 rounded-full w-3/4"></div>
+        <div class="h-2.5 bg-zinc-800/40 rounded-full w-1/2"></div>
+      `;
+      threadContainer.appendChild(loader);
+      threadScroll.scrollTop = threadScroll.scrollHeight;
+    }
+
+    function hideLoading() {
+      const loader = document.getElementById('shimmerLoader');
+      if (loader) loader.remove();
+    }
+
+    function escapeHtml(str) {
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    window.copyText = (btn, enc) => {
+      const text = decodeURIComponent(enc);
+      navigator.clipboard.writeText(text).then(() => {
+        const span = btn.querySelector('span');
+        const old = span.textContent;
+        span.textContent = 'Copied';
+        setTimeout(() => span.textContent = old, 1500);
+      });
+    };
+
+    window.speakText = (enc) => {
+      if (!('speechSynthesis' in window)) return;
+      window.speechSynthesis.cancel();
+      const text = decodeURIComponent(enc).replace(/[#*`_~[\]]/g, '');
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.rate = 1.05;
+      window.speechSynthesis.speak(utterance);
+    };
+
+    // Health check against FastAPI backend
+    async function checkServerHealth() {
+      const dots = document.querySelectorAll('.server-status-dot');
+      const texts = document.querySelectorAll('.server-status-text');
+      const endpoint = apiUrlInput.value.trim() || 'http://127.0.0.1:8000/api/v1/chat';
+      try {
+        const res = await fetch(endpoint, { method: 'OPTIONS' });
+        const online = res.ok || res.status === 405 || res.status === 200;
+        dots.forEach(d => d.className = `server-status-dot w-1.5 h-1.5 rounded-full ${online ? 'bg-emerald-500' : 'bg-rose-500'}`);
+        texts.forEach(t => {
+          t.textContent = online ? 'Online' : 'Offline';
+          t.className = `server-status-text text-[10px] font-mono ${online ? 'text-emerald-400' : 'text-rose-400'}`;
+        });
+      } catch (e) {
+        dots.forEach(d => d.className = 'server-status-dot w-1.5 h-1.5 rounded-full bg-rose-500');
+        texts.forEach(t => {
+          t.textContent = 'Offline';
+          t.className = 'server-status-text text-[10px] font-mono text-rose-400';
+        });
+      }
+    }
+
+    // Reset current thread memory on server
+    const clearThreadBtn = document.getElementById('clearThreadBtn');
+    if (clearThreadBtn) {
+      clearThreadBtn.addEventListener('click', async () => {
+        const endpoint = apiUrlInput.value.trim() || 'http://127.0.0.1:8000/api/v1/chat';
+        try {
+          await fetch(`${endpoint}?thread_id=${encodeURIComponent(state.currentId)}`, { method: 'DELETE' });
+          const chat = state.chats.find(c => c.id === state.currentId);
+          if (chat) {
+            chat.messages = [];
+            save();
+            loadChat(state.currentId);
+          }
+          settingsMenu.classList.add('hidden');
+        } catch (e) {
+          alert('Could not reset thread: ' + e.message);
+        }
+      });
+    }
+
+    apiUrlInput.addEventListener('change', checkServerHealth);
+    setInterval(checkServerHealth, 15000);
+
+    // Submit Handler
+    commandForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const prompt = promptInput.value.trim();
+
+      if (!prompt && !state.currentFile) return;
+
+      const fileToSend = state.currentFile;
+      const previewSrc = state.currentFile ? attachedThumb.src : null;
+
+      const chat = state.chats.find(c => c.id === state.currentId);
+      if (chat && !chat.messages.length) {
+        chat.title = prompt.slice(0, 28) || 'Image Analysis';
+        headerTitle.textContent = chat.title;
+        renderHistory();
+      }
+
+      // Record user message
+      const userMsg = {
+        role: 'user',
+        content: prompt || 'Analyze this image',
+        imageSrc: previewSrc,
+        timestamp: Date.now()
+      };
+      chat.messages.push(userMsg);
+      renderMessage(userMsg);
+      save();
+
+      // Clear input
+      promptInput.value = '';
+      promptInput.style.height = 'auto';
+      state.currentFile = null;
+      fileInput.value = '';
+      attachmentPill.classList.add('hidden');
+      updateSendButtonState();
+
+      showLoading();
+      const startTime = performance.now();
+
+      // FormData for FastAPI backend
+      const formData = new FormData();
+      formData.append('prompt', prompt || 'Analyze this image');
+      formData.append('thread_id', state.currentId);
+      if (fileToSend) formData.append('image', fileToSend);
+
+      const endpoint = apiUrlInput.value.trim() || 'http://127.0.0.1:8000/api/v1/chat';
+
+      try {
+        const resp = await fetch(endpoint, {
+          method: 'POST',
+          body: formData
+        });
+
+        if (!resp.ok) {
+          const errText = await resp.text();
+          throw new Error(`HTTP ${resp.status}: ${errText}`);
+        }
+
+        const data = await resp.json();
+        const latency = ((performance.now() - startTime) / 1000).toFixed(2);
+        hideLoading();
+
+        let reply = '';
+        if (typeof data === 'string') reply = data;
+        else if (Array.isArray(data)) reply = data.map(i => i.text || JSON.stringify(i)).join('\n');
+        else if (data && typeof data === 'object') reply = data.text || data.response || JSON.stringify(data, null, 2);
+        else reply = String(data);
+
+        const aiMsg = {
+          role: 'assistant',
+          content: reply,
+          latency: latency,
+          timestamp: Date.now()
+        };
+        chat.messages.push(aiMsg);
+        renderMessage(aiMsg);
+        save();
+
+      } catch (err) {
+        hideLoading();
+        console.error(err);
+        const errorMsg = {
+          role: 'assistant',
+          content: `Unable to connect to \`${endpoint}\`.\n\n*${err.message}*\n\nEnsure backend is running:\n\`\`\`bash\nsource venv/bin/activate\nuvicorn main:app --reload\n\`\`\``,
+          timestamp: Date.now()
+        };
+        chat.messages.push(errorMsg);
+        renderMessage(errorMsg);
+        save();
+      } finally {
+        updateSendButtonState();
+        promptInput.focus();
+      }
+    });
+
+    init();
+  </script>
+</body>
+</html>
